@@ -2,11 +2,10 @@
 package analyse
 
 import (
+	"github.com/mojiehai/jiebago/posseg"
 	"sort"
 	"strings"
 	"unicode/utf8"
-
-	"github.com/mojiehai/jiebago"
 )
 
 // Segment represents a word with weight.
@@ -46,7 +45,7 @@ func (ss Segments) Swap(i, j int) {
 
 // TagExtracter is used to extract tags from sentence.
 type TagExtracter struct {
-	seg      *jiebago.Segmenter
+	seg      *posseg.Segmenter
 	idf      *Idf
 	stopWord *StopWord
 }
@@ -54,7 +53,7 @@ type TagExtracter struct {
 // LoadDictionary reads the given filename and create a new dictionary.
 func (t *TagExtracter) LoadDictionary(fileName string) error {
 	t.stopWord = NewStopWord()
-	t.seg = new(jiebago.Segmenter)
+	t.seg = new(posseg.Segmenter)
 	return t.seg.LoadDictionary(fileName)
 }
 
@@ -70,22 +69,40 @@ func (t *TagExtracter) LoadStopWords(fileName string) error {
 	return t.stopWord.loadDictionary(fileName)
 }
 
+
 // ExtractTags extracts the topK key words from sentence.
-func (t *TagExtracter) ExtractTags(sentence string, topK int) (tags Segments) {
+// Parameter allowPOS allows a customized pos list.
+func (t *TagExtracter) ExtractTagsWithPOS(sentence string, topK int, allowPOS []string) (tags Segments) {
 	freqMap := make(map[string]float64)
 
+	// allowPos值转键
+	allowPOSMap := map[string]interface{}{}
+	for _, k := range allowPOS {
+		allowPOSMap[k] = 1
+	}
+
 	for w := range t.seg.Cut(sentence, true) {
-		w = strings.TrimSpace(w)
-		if utf8.RuneCountInString(w) < 2 {
+		// 词性过滤
+		if len(allowPOS) > 0 {
+			_, ok := allowPOSMap[w.Pos()]
+			if !ok {
+				continue
+			}
+		}
+
+		// 长度<2或者在停止词中过滤
+		word := strings.TrimSpace(w.Text())
+		if utf8.RuneCountInString(word) < 2 {
 			continue
 		}
-		if t.stopWord.IsStopWord(w) {
+
+		if t.stopWord.IsStopWord(strings.ToLower(word)) {
 			continue
 		}
-		if f, ok := freqMap[w]; ok {
-			freqMap[w] = f + 1.0
+		if f, ok := freqMap[word]; ok {
+			freqMap[word] = f + 1.0
 		} else {
-			freqMap[w] = 1.0
+			freqMap[word] = 1.0
 		}
 	}
 	total := 0.0
@@ -112,4 +129,10 @@ func (t *TagExtracter) ExtractTags(sentence string, topK int) (tags Segments) {
 		tags = ws
 	}
 	return tags
+}
+
+
+// ExtractTags extracts the topK key words from sentence.
+func (t *TagExtracter) ExtractTags(sentence string, topK int) (tags Segments) {
+	return t.ExtractTagsWithPOS(sentence, topK, defaultAllowPOS)
 }
