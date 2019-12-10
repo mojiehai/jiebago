@@ -3,7 +3,7 @@ package tokenizers_test
 import (
 	"fmt"
 
-	"github.com/wangbin/jiebago/tokenizers"
+	"github.com/mojiehai/jiebago/tokenizers"
 )
 
 func Example() {
